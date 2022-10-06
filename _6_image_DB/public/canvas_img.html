@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>CANVAS IMAGE Database Node</title>
+    </head>
+    <body>
+        <div>
+            <canvas id="my_canvas" width="800" height="700"></canvas>
+        </div>
+    </body>
+    <script>
+        const my_canvas = document.getElementById('my_canvas')
+
+        // context : canvas 안의 컨트롤 포인트,
+        //           ex) context 부분에 사각형 그림을 그려라!
+        const ctx = my_canvas.getContext('2d') // 2d 형태로
+
+        // 서버에 요청하고 response 받기
+        const response = fetch('/getimgfromdb',{
+            method: 'post',
+            headers:{
+                'content-type':'application/json'
+            }
+        })
+        // json 형식으로 parsing(파싱)
+        .then((res)=>res.json())
+        // parsing 완료되면
+        // async -> await를 사용하기 위해
+        .then(async (res)=>{
+
+            // 사진 추출 
+            // --> (사진은 2차원처럼 보이지만, 1차원으로 표현)
+            // Uint8Array : unsigned int 8bytes 배열로 만듦
+            // -> 사진이미지라는 것은, 각각의 픽셀(조각)이 1byte로 이루어짐
+            // -> 흑백이미지는 각 픽셀들의 모음이 한 장
+            // -> 컬러이미지는 각 픽세들의 모음이 여러 장
+
+            // result -> 0번째 row -> 'img' -> 'data'
+            const binary = new Uint8Array(res['result'][0]['img']['data'])
+            // blob으로 바꾸기 , type은 jpeg
+            const blob = new Blob([binary],{type:'image/jpeg'})
+            // 압축 풀어서 실제 이미지로 만들기
+            const kimg = new Image()
+
+            // 빈 이미지에 blob 이 로딩
+            kimg.src = URL.createObjectURL(blob)
+
+            // 빈 이미지로 blob이 들어갈 때까지 기다려줘야 함
+            const imgLoadingDone = await kimg.decode()
+
+            // context에 그리기
+           
+            // --> 0,0 에서 시작해서 원본크기만큼
+            ctx.drawImage(kimg,0,0)
+            // --> 0,0 에서 시작해서 사진 크기를 400x400으로 resizing
+            // ctx.drawImage(kimg,0,0,400,400)  
+        })
+        
+
+
+
+
+
+        // 그림그리기 예제
+
+
+        // //ctx.fillStyle = 'blue'
+        // ctx.strokeRect(10,10,490,490)
+
+        // ctx.beginPath();
+        // ctx.arc(75, 75, 50, 0, Math.PI * 2, true); // Outer circle
+        // ctx.moveTo(110, 75);
+        // ctx.arc(75, 75, 35, 0, Math.PI, false);  // Mouth (clockwise)
+        // ctx.moveTo(65, 65);
+        // ctx.arc(60, 65, 5, 0, Math.PI * 2, true);  // Left eye
+        // ctx.moveTo(95, 65);
+        // ctx.arc(90, 65, 5, 0, Math.PI * 2, true);  // Right eye
+        // ctx.stroke();
+    </script>
+</html>
