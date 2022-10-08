@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://unpkg.com/fabric@4.6.0/dist/fabric.min.js"></script>
+    <title>Fabricjs 테스트</title>
+</head>
+<body>
+    <div>
+        <canvas id="c" width="500" height="500" tabindex="1"></canvas>
+    </div>
+    <script>
+        const canvas = new fabric.Canvas('c')
+        // 이미지를 불러서 background로 설정
+        fabric.Image.fromURL('img_tiger.jpg',(img)=>{
+            canvas.setBackgroundImage(img,canvas.renderAll.bind(canvas),{
+                // 이미지를 어떤 크기로 넣을건지 조정
+                scaleX: canvas.width/img.width,
+                scaleY: canvas.height/img.height
+            })
+        })
+        // 마우스를 클릭하고 그 지점부터 드래그하면
+        // 사각형이 생성되게 하기 (대각선방향으로 드래그)
+        // click   -> mouse:down
+        // move    -> mouse:move
+        // unclick -> mouse:up
+
+        // Mouse가 눌렸는지 추적하는 변수
+        // -> Mouse가 눌린상태에서 움직여야 mouse:move
+        // -> 그냥 움직이는 건 아무것도 아님
+        let isDown = false
+        let ox,oy // 좌표
+        let rect
+
+        // Mouse click되었을 때의 event 처리
+        canvas.on('mouse:down',(o)=>{
+            // click된 곳이 이미 만들어진 사각형이라면
+            // move 하는 것이므로 , 새로운 사각형을 만들면 안 됨
+            if(o.target){
+                return
+            }
+
+            isDown =true
+            const pointer = canvas.getPointer(o.e)
+            ox = pointer.x
+            oy = pointer.y
+            rect = new fabric.Rect({
+                // 좌상단을 기준으로 사각형 그림
+                originX : 'left',
+                originY:'top',
+                left:ox,
+                top:oy,
+                width:pointer.x -ox,
+                height:pointer.y - oy,
+                angle:0,
+                fill:'rgba(255,0,0,0.5)', // 투명도 절반
+                transparentCorners:false  // 모서리는 투명하지 않게
+            })
+            
+            // 사각형 회전 금지
+            rect.setControlsVisibility({mtr:false})
+
+            canvas.add(rect)
+        })
+
+        // Mouse가 움직일 때의 event 처리
+        canvas.on('mouse:move',(o)=>{
+            // 단순한 움직임은 그냥 return
+            if(!isDown){
+                return;
+            }
+            // 드래그 상태일 때만, 사각형 크기 조절
+            const pointer = canvas.getPointer(o.e)
+            // 처음 찍은 좌표에서 오른쪽이나 밑으로 가는 것이 아닌,
+            // 왼쪽이나 위로 간다면
+            if(ox > pointer.x){
+                rect.set({
+                    left:pointer.x,
+                })
+            }
+            if(oy > pointer.y){
+                rect.set({
+                    top:pointer.y
+                })
+            }
+            rect.set({
+                width: Math.abs(ox-pointer.x),
+                height: Math.abs(oy-pointer.y),
+            })
+            canvas.renderAll();
+        })
+
+        // Mouse unclick되었을 때의 event 처리
+        canvas.on('mouse:up',(o)=>{
+            // 너무 작은 사각형은 지워버리기 (실수로 눌렸을 경우)
+            if(rect){
+                if(rect.width <30 || rect.height <30){
+                    canvas.remove(rect)
+                }
+            }
+            isDown = false
+            rect = undefined
+        })
+        
+        // 키보드 눌렸을 시 event 처리
+        document.onkeydown = (e) =>{
+            switch(e.keyCode){
+                case 46: // 'delete'의 keycode
+                canvas.remove(canvas.getActiveObject())
+                break
+            }
+            canvas.renderAll()
+        }
+
+    </script>
+</body>
+</html>
