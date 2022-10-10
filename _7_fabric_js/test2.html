@@ -11,6 +11,9 @@
     <div>
         <canvas id="c" width="500" height="500" tabindex="1"></canvas>
     </div>
+    <div>
+        <button id="savebtn">저장하기</button>
+    </div>
     <script>
         const canvas = new fabric.Canvas('c')
         // 이미지를 불러서 background로 설정
@@ -113,6 +116,15 @@
             }
             canvas.renderAll()
         }
+
+        document.getElementById('savebtn').addEventListener('click',()=>{
+            // rect 객체 잡아두기
+            const objects = canvas.getObjects('rect')
+            objects.forEach((object)=>{
+                console.log(`BBOX 정보: ${Object.keys(object)}`)
+                console.log(`left: ${object.left} top: ${object.top} width: ${object.width} height: ${object.height}`)
+            })
+        })
 
     </script>
 </body>

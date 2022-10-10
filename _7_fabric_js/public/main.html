@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://unpkg.com/fabric@4.6.0/dist/fabric.min.js"></script>
+    <title>Fabricjs Database 테스트</title>
+</head>
+<body>
+    <div>
+        <canvas id="c" width="500" height="500" tabindex="1"></canvas>
+    </div>
+    <div>
+        <label>이미지이름</label>
+        <input type="text" id="imgname">
+        <button id="loadbtn">가져오기</button>
+        <button id="savebtn">저장하기</button>
+    </div>
+    <script>
+        const canvas = new fabric.Canvas('c')
+        
+        // '가져오기'버튼을 눌렀을 때 DB에서 이미지 가져오기
+        document.getElementById('loadbtn').addEventListener('click',async()=>{
+            console.log(`가져올 이미지 : ${document.getElementById('imgname').value}`)
+            const response = await fetch('/getimgfromdbbyname',{
+                method:'POST',
+                headers:{
+                    'Content-type': 'application/json'
+                },
+                body : JSON.stringify({
+                    imgname:document.getElementById('imgname').value
+                })
+            })
+
+            if(response.ok){
+                const res = await response.json()
+                const status = res['status']
+
+                if(status === 'ok'){
+                    // 이미지를 받아서 canvas에 그려줌
+                    const imgdata = res['rows'][0]['img']['data']
+                    // imgdata를 binary로 바꿈
+                    const binary = new Uint8Array(imgdata)
+                    const blob = new Blob([binary],{type:'image/jpeg'})
+                    // Image 하나 만들고
+                    const kimg = new Image()
+                    // 그 Image에 DB로부터 가져온 이미지를 넣는다
+                    kimg.src = URL.createObjectURL(blob)
+                    await kimg.decode()
+                    canvas.clear()
+                    // canvas에 background 이미지로 넣음
+                    fabric.Image.fromObject(kimg,(img)=>{
+                        canvas.setBackgroundImage(img,canvas.renderAll.bind(canvas),{
+                            scaleX:canvas.width / kimg.width,
+                            scaleY:canvas.height/ kimg.height
+                        })
+                    })
+                }
+                else{
+                    alert(`에러 발생 : ${status}`)
+                    return
+                }
+            }
+
+        })
+
+        // 마우스를 클릭하고 그 지점부터 드래그하면
+        // 사각형이 생성되게 하기 (대각선방향으로 드래그)
+        // click   -> mouse:down
+        // move    -> mouse:move
+        // unclick -> mouse:up
+
+        // Mouse가 눌렸는지 추적하는 변수
+        // -> Mouse가 눌린상태에서 움직여야 mouse:move
+        // -> 그냥 움직이는 건 아무것도 아님
+        let isDown = false
+        let ox,oy // 좌표
+        let rect
+
+        // Mouse click되었을 때의 event 처리
+        canvas.on('mouse:down',(o)=>{
+            // click된 곳이 이미 만들어진 사각형이라면
+            // move 하는 것이므로 , 새로운 사각형을 만들면 안 됨
+            if(o.target){
+                return
+            }
+
+            isDown =true
+            const pointer = canvas.getPointer(o.e)
+            ox = pointer.x
+            oy = pointer.y
+            rect = new fabric.Rect({
+                // 좌상단을 기준으로 사각형 그림
+                originX : 'left',
+                originY:'top',
+                left:ox,
+                top:oy,
+                width:pointer.x -ox,
+                height:pointer.y - oy,
+                angle:0,
+                fill:'rgba(255,0,0,0.5)', // 투명도 절반
+                transparentCorners:false  // 모서리는 투명하지 않게
+            })
+            
+            // 사각형 회전 금지
+            rect.setControlsVisibility({mtr:false})
+
+            canvas.add(rect)
+        })
+
+        // Mouse가 움직일 때의 event 처리
+        canvas.on('mouse:move',(o)=>{
+            // 단순한 움직임은 그냥 return
+            if(!isDown){
+                return;
+            }
+            // 드래그 상태일 때만, 사각형 크기 조절
+            const pointer = canvas.getPointer(o.e)
+            // 처음 찍은 좌표에서 오른쪽이나 밑으로 가는 것이 아닌,
+            // 왼쪽이나 위로 간다면
+            if(ox > pointer.x){
+                rect.set({
+                    left:pointer.x,
+                })
+            }
+            if(oy > pointer.y){
+                rect.set({
+                    top:pointer.y
+                })
+            }
+            rect.set({
+                width: Math.abs(ox-pointer.x),
+                height: Math.abs(oy-pointer.y),
+            })
+            canvas.renderAll();
+        })
+
+        // Mouse unclick되었을 때의 event 처리
+        canvas.on('mouse:up',(o)=>{
+            // 너무 작은 사각형은 지워버리기 (실수로 눌렸을 경우)
+            if(rect){
+                if(rect.width <30 || rect.height <30){
+                    canvas.remove(rect)
+                }
+            }
+            isDown = false
+            rect = undefined
+        })
+        
+        // 키보드 눌렸을 시 event 처리
+        document.onkeydown = (e) =>{
+            switch(e.keyCode){
+                case 46: // 'delete'의 keycode
+                canvas.remove(canvas.getActiveObject())
+                break
+            }
+            canvas.renderAll()
+        }
+
+        // '저장하기' 버튼 눌렀을 때
+        document.getElementById('savebtn').addEventListener('click',async()=>{
+            // rect 객체 잡아두기
+            const objects = canvas.getObjects('rect')
+
+            // rect에 있는 좌표들을 하나의 문자열로 모으기 배열
+            const coords = []
+
+            objects.forEach((object)=>{
+                console.log(`left: ${object.left} top: ${object.top} width: ${object.width} height: ${object.height}`)
+                coords.push(`${object.left} ${object.top} ${object.width} ${object.height}`)
+            })
+            
+            // 서버를 통해 DB에 저장할 객체
+            const data_to_be_stored = {
+                imgname : document.getElementById('imgname').value,
+                // '\n'으로 문자열들을 구분해 하나의 문자열로 저장
+                coords:coords.join('\n')
+            }
+            // DB에 저장하기 위해 서버로 보냄
+            const response = await fetch('/saveBbox',{
+                method:'POST',
+                headers : {
+                    'Content-type' : 'application/json',
+                },
+                body:JSON.stringify(data_to_be_stored)
+            })
+
+            if(response.ok){
+                const res = await response.json()
+                if(res['status'] == 'ok'){
+                    alert('저장에 성공하였습니다')
+                    return
+                }
+            }
+            alert('저장에 실패하였습니다')
+        })
+
+    </script>
+</body>
+</html>

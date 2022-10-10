@@ -24,7 +24,7 @@ app.post('/getimgfromdb',(req,res)=>{
     console.log('getimgfromdb 호출됨')
 
     pool.getConnection((err,conn)=>{
-        const query_str = 'select * from animals where rid=4;'
+        const query_str = 'select * from animals where rid=7;'
         // fields : row의 각 항목
         conn.query(query_str,(error,rows,fields)=>{
             if(error){
